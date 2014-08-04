@@ -22,7 +22,7 @@ JAVASCRIPT_FILE_NAME='user_details.js'
 #Fields
 _intervalUpdate="10"
 _iterationPublish="3"
-_iterationBackup="6"
+_iterationBackup="3600"
 _resetDay="1"
 _userFilePath="/root/users.txt"
 _backupUsageFilePath="/tmp/mac_usage.backup"
@@ -37,7 +37,7 @@ _recordDailyUsage=0 #Optional 13
 _autoAddUserMACs=1 #Optional 14
 _supportBit32=0 #Optional 15
 _showMAC=0 #Optional 16
-_logFilePath='/tmp/bw.log' #Optional 17
+_logFilePath='' #Optional 17
 _clientsDetails=""
 _dnsmasqFilePath=""
 _previousDay=`date +%d`
@@ -246,6 +246,7 @@ backupAndUpdates()
 	loadUsageData
 	
 	echo "$_macUsageData" > $_backupUsageFilePath
+    /root/dropbox_uploader.sh -k -q -f /root/.dropbox_uploader upload $_backupUsageFilePath /
 	
 	userFileUpdate
 	unloadUsageData
@@ -261,6 +262,8 @@ resetUsage()
 	if [ ! -f $backupFilePath ]; then
 		loadUsageData
 		echo "$_macUsageData" > $backupFilePath
+        /root/dropbox_uploader.sh -k -q -f /root/.dropbox_uploader upload $backupFilePath /
+
 		if [ $? -eq 0 ]; then
 			[ -n "$_logFilePath" ] && bwMonitorLog 'USAGE DATA ARCHIVED'
 			_macUsageData=''
@@ -722,7 +725,10 @@ if [ -z "$_javascriptPath" ]; then
     mkdir -p /tmp/www/
 fi
 if [ $_doUsageFileRestore -eq 1 ]; then
-	[ "$_macUsageFilePath" = "1" ] && _macUsageData=`cat $_backupUsageFilePath` || cp -f $_backupUsageFilePath $_macUsageFilePath
+    echo "Getting backup from Dropbox"
+	[ "$_macUsageFilePath" = "1" ] && wget –no-check-certificate -O $_macUsageFilePath –no-check-certificate
+    echo "DONE"
+    #_macUsageData=`cat $_backupUsageFilePath` || cp -f $_backupUsageFilePath $_macUsageFilePath
 fi
 #Check for a DNS file being passed through. If it is passed in, we need to convert it
 isDNSMASQFilePath=`echo "$_userFilePath" | grep -i "dnsmasq"`
