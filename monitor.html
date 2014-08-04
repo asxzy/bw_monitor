@@ -1,0 +1,785 @@
+<html>
+<head>
+<meta http-equiv="no-cache">
+    <script type="text/javascript">
+        _todaysDay = 0;
+		_userSelectDay=0;
+		_baseSelect=1000;
+		_useSuffix='';
+		_serverDateTime='Not Available'
+		_stopRefresh=false;
+		_supportBit32=0;
+		var suffixArray = ['bytes', 'kb', 'MB', 'GB', 'TB', 'PB'];
+		function getUsageDisplay(index)
+		{
+			return suffixArray[index];
+		}
+        function readablizeBytes(bytes) {
+			if(_baseSelect != 1024 && _baseSelect != 1000)
+				_baseSelect=1000;
+			if(_supportBit32 > 0)
+				bytes = bytes * _supportBit32;
+
+            if (bytes <= 0)
+                return '0 ' + getUsageDisplay(0);
+            
+            var e = Math.floor(Math.log(bytes) / Math.log(_baseSelect));
+			var suffix = " " + getUsageDisplay(e);
+			if(_useSuffix || _useSuffix != "") { e = _useSuffix; suffix = ''}
+			
+            return (bytes / Math.pow(_baseSelect, Math.floor(e))).toFixed(2) + suffix;
+        }	
+		function getQueryParamValue( name )
+		{
+		  name = name.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");
+		  var regexS = "[\\?&]"+name+"=([^&#]*)";
+		  var regex = new RegExp( regexS );
+		  var results = regex.exec( window.location.href );
+		  if( results == null )
+			return "";
+		  else
+			return results[1];
+		}
+		function getReloadQueryString()
+		{
+			queryParamStart = window.location.href.indexOf('?');
+			currentHref = window.location.href;
+			if(queryParamStart > 0)
+				currentHref=currentHref.substr(0, queryParamStart);
+
+			currentHref += '?usageDay='+_userSelectDay+'&baseSelected='+_baseSelect+'&useSuffixIndex='+_useSuffix;
+			return currentHref;
+		}
+		function setGloablVariables()
+		{
+			_userSelectDay = getQueryParamValue('usageDay');
+			_baseSelect = getQueryParamValue('baseSelected');
+			_useSuffix = getQueryParamValue('useSuffixIndex');
+		}
+		function stopAutoRefresh()
+		{
+			_stopRefresh=true;
+		}
+		function startAutoRefresh()
+		{
+			_stopRefresh=false;
+			setTimeout(doRefresh, 1000);
+		}
+		function reloadPage()
+		{
+			window.location.href = getReloadQueryString();
+		}
+		function refresh()
+		{
+			setTimeout(doRefresh, 1000);
+		}
+		function doRefresh()
+		{
+			refreshLink=document.getElementById("a_refresh");
+			refreshInput=document.getElementById("refreshSeconds");
+			refreshTime= (refreshInput.value - 1);
+			refreshInput.value=refreshTime;
+			if(refreshTime <= 0)
+			{
+				refreshInput.value = 120;
+				reloadPage();
+			}
+
+			if(!_stopRefresh)
+				setTimeout(doRefresh, 1000);
+		}
+    </script>
+    <script type='text/javascript' src='http://192.168.1.1:88/user_details.js'></script>
+    <script type='text/javascript'>
+		var totalUsageDownloaded=0;
+		var totalUsageUploaded=0;
+        for (userIndex = 0; userIndex < users.length; userIndex++) {
+            var currentUser = users[userIndex];
+            currentUser.totalDown = 0;
+            currentUser.totalUp = 0;
+            for (usageIndex = 0; usageIndex < (currentUser.userUsage.length); usageIndex++) {
+                var currentUsage = currentUser.userUsage[usageIndex];
+                currentUsage.totalDown = 0;
+                currentUsage.totalUp = 0;
+                for (dayUsageIndex = 0; dayUsageIndex < currentUsage.dayUsages.length; dayUsageIndex++) {
+                    var currentDay = currentUsage.dayUsages[dayUsageIndex];
+					if(currentDay)
+					{
+                      currentUsage.totalDown += currentDay.down;
+                      currentUsage.totalUp += currentDay.up;
+					}
+                }
+                currentUsage.total = currentUsage.totalDown + currentUsage.totalUp;
+                currentUser.totalDown += currentUsage.totalDown;
+                currentUser.totalUp += currentUsage.totalUp;
+            }
+			totalUsageDownloaded += currentUser.totalDown;
+			totalUsageUploaded += currentUser.totalUp;
+        }
+		function doDayUsage()
+		{
+			var usageContainer = document.getElementById("dayUsageContainer");
+			daysUsage = document.getElementById("dayInput").value;
+			if(daysUsage && (daysUsage > 0 && daysUsage < 32))
+				_userSelectDay = daysUsage;
+			else
+				_userSelectDay = _todaysDay;
+			containerHTML="";
+			totalUsersDayUsageDown=0;
+			totalUsersDayUsageUp=0;
+			for (userIndex = 0; userIndex < users.length; userIndex++) {
+				containerHTML+='<div class="result_section">';
+				var currentUser = users[userIndex];
+				var totalTodaysUsageDown = 0;
+				var totalTodaysUsageUp = 0;
+				for (usageIndex = 0; usageIndex < (currentUser.userUsage.length + 1); usageIndex++) {
+					var currentUsage = currentUser.userUsage[usageIndex];
+					dayDownUsage = 0;
+					dayUpUsage = 0;
+					if (currentUsage) {
+						var todaysUsage = currentUsage.dayUsages[(_userSelectDay - 1)];
+						if (todaysUsage) {
+							dayDownUsage = todaysUsage.down;
+							dayUpUsage = todaysUsage.up;
+						}
+					}
+					containerHTML+='<div class="small_result">';
+					if (usageIndex == 0) containerHTML+=currentUser.ID; else containerHTML+='&nbsp;';
+					containerHTML+='</div>';
+					containerHTML+='<div class="space">';
+					if (currentUsage) containerHTML+=currentUsage.ID; else containerHTML+='<b>Total</b>';
+					containerHTML+='</div>';
+					containerHTML+='<div class="result">';
+					if (currentUsage) containerHTML+=readablizeBytes(dayDownUsage); else containerHTML+='<font color="green"><b>' + readablizeBytes(totalTodaysUsageDown) + '</b></font>';
+					containerHTML+='</div>';
+					containerHTML+='<div class="result">';
+					if (currentUsage) containerHTML+=readablizeBytes(dayUpUsage); else containerHTML+='<font color="green"><b>' + readablizeBytes(totalTodaysUsageUp) + '</b></font>';
+					containerHTML+='</div>';
+					containerHTML+='<div class="result">';
+					if (currentUsage) containerHTML+=readablizeBytes(dayDownUsage + dayUpUsage); else containerHTML+='<font color="green"><b>' + readablizeBytes(totalTodaysUsageDown + totalTodaysUsageUp) + '</b></font>';
+					containerHTML+='</div>';
+					containerHTML+='<br />';
+					totalTodaysUsageDown += dayDownUsage;
+					totalTodaysUsageUp += dayUpUsage;
+				}
+				containerHTML+='</div>';
+				totalUsersDayUsageDown += totalTodaysUsageDown;
+				totalUsersDayUsageUp += totalTodaysUsageUp;
+			}
+
+			containerHTML += '<div style="clear: both">';
+			containerHTML+='<div class="result_section" style="padding-top:20px;">';
+			containerHTML+='<div class="small_result">';
+			containerHTML+='<b>TOTAL</b>';
+			containerHTML+='</div>';
+			containerHTML+='<div class="space">';
+			containerHTML+='&nbsp;';
+			containerHTML+='</div>';
+			containerHTML+='<div class="result">';
+			containerHTML+='<font color="orange"><b>' + readablizeBytes(totalUsersDayUsageDown) + '</b></font>';
+			containerHTML+='</div>';
+			containerHTML+='<div class="result">';
+			containerHTML+='<font color="blue"><b>' + readablizeBytes(totalUsersDayUsageUp) + '</b></font>';
+			containerHTML+='</div>';
+			containerHTML+='<div class="result">';
+			containerHTML+='<font color="green"><b>' + readablizeBytes(totalUsersDayUsageDown + totalUsersDayUsageUp) + '</b></font>';
+			containerHTML+='</div>';
+			containerHTML+='<br />';
+			containerHTML+='</div>';
+
+			usageContainer.innerHTML = containerHTML;
+			document.getElementById("dayInput").value = _userSelectDay;
+		}
+		setGloablVariables();
+    </script>
+    <style type="text/css">
+        .bwm_monthly_detailed
+        {
+        }
+        .bwm_monthly_detailed .headers
+        {
+        }
+        .bwm_monthly_detailed .headers .header
+        {
+            float: left;
+            width: 200px;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .bwm_monthly_detailed .results
+        {
+        }
+        .bwm_monthly_detailed .results .result
+        {
+            float: left;
+            width: 200px;
+            text-align: center;
+        }
+        .bwm_monthly_detailed .headers .small_header
+        {
+            font-size: 15px;
+            font-weight: bold;
+            width: 150px;
+            float: left;
+        }
+        .bwm_monthly_detailed .results .small_result
+        {
+            width: 150px;
+            float: left;
+        }
+        .bwm_monthly_detailed .space
+        {
+            float: left;
+            width: 100px;
+        }
+        .bwm_monthly_summary
+        {
+        }
+        .bwm_monthly_summary .headers
+        {
+        }
+        .bwm_monthly_summary .headers .header
+        {
+            float: left;
+            width: 200px;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .bwm_monthly_summary .headers .small_header
+        {
+            float: left;
+            width: 250px;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: left;
+        }
+        .bwm_monthly_summary .results
+        {
+        }
+        .bwm_monthly_summary .results .small_result
+        {
+            float: left;
+            width: 250px;
+            text-align: left;
+        }
+        .bwm_monthly_summary .results .result
+        {
+            float: left;
+            width: 200px;
+            text-align: center;
+        }
+        .bwm_day_summary
+        {
+        }
+        .bwm_day_summary header
+        {
+        }
+        .bwm_day_summary .left_legend
+        {
+            float: left;
+            width: 50px;
+            text-align: left;
+            font-weight: bold;
+            padding-right: 5px;
+        }
+        .bwm_day_summary .left_legend .header
+        {
+            float: left;
+            font-size: 15px;
+        }
+        .bwm_day_summary .left_legend .day
+        {
+            width: 30px;
+            text-align: center !important;
+            padding-bottom: 2px;
+        }
+        .bwm_day_summary .result
+        {
+            float: left;
+            width: 200px;
+            text-align: center;
+        }
+        .bwm_day_summary .result .header
+        {
+            width: 100%;
+            float: left;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        .bwm_day_summary .in_result
+        {
+            float: left;
+            width: 50%;
+        }
+        .bwm_day_summary .out_result
+        {
+            float: left;
+            width: 50%;
+        }
+        .day_result
+        {
+            float: left;
+            width: 100%;
+            padding-bottom: 3px;
+        }
+        .bwm_align_middle
+        {
+            text-align: center;
+        }
+        .result_section
+        {
+            float: left;
+            padding-bottom: 10px;
+            width: 100%;
+        }
+        .bwm_section_heading
+        {
+            font-weight: bolder;
+            font-size: 25px;
+            margin-bottom: 10px;
+            margin-top: 10px;
+        }
+        .bwm_main_heading
+        {
+            font-weight: bolder;
+            font-size: 50px;
+            margin-bottom: 10px;
+            margin-top: 10px;
+            text-align:center;
+        }
+        .bwm_body
+        {
+            width: 900px;
+			font-family:arial;
+        }
+		.bwm_usage_summary
+		{
+			float:left;
+			width:150px;
+			font-size:20px;
+			font-weight:bold;
+		}
+		
+		.bwm_wrap_static_column
+		{
+		}
+		.bwm_wrap_data
+		{
+		  float:left;
+		}
+		.bwm_wrap{
+		  width:93.5%;
+		  overflow:auto;
+		  overflow-y:hidden;
+		  float:left;
+		}
+		
+		.bwm_wrap_static_column_daily
+		{
+			float:left;
+		}
+		.bwm_wrap_daily{
+		  width:58%;
+		  overflow:auto;
+		  overflow-y:hidden;
+		  float:left;
+		}
+		.bwm_wrap_data_daily
+		{
+		  float:left;
+		  width:3600px;
+		}	
+		.bwm_daily_summary_name_td
+		{
+			width:150px;
+			height:25px;
+			font-weight:bold;
+		}
+		.bwm_daily_summary_usage_td
+		{
+			width:100px;
+			height:25px;
+			font-weight:bold;
+		}	
+		.bwm_daily_usage_header_td
+		{
+			font-weight:bold;
+			text-align:center;
+			height:25px;
+		}
+		.bwm_daily_usage_td
+		{
+			text-align:center;
+			height:25px;
+		}
+    </style>
+</head>
+<body onload="refresh()">
+    <div class="bwm_body">
+        <div class="bwm_main_heading">
+            INTERNET USAGE STATISTICS
+        </div>
+		<div>
+		<a href="#" id="a_refresh" style="color:blue;" onclick="reloadPage();"><u>Refresh</u></a>&nbsp;in&nbsp;
+		<input type="input" id="refreshSeconds" style="width:40px" value="120" />
+		<a href="#" id="a_refresh" style="color:blue;" onclick="stopAutoRefresh();"><u>Stop</u></a>
+		<a href="#" id="a_refresh" style="color:blue;" onclick="startAutoRefresh();"><u>Start</u></a>
+		</div>
+        <div class="bwm_section_heading">
+            Summary
+            <hr />
+        </div>
+		<div>
+			Internet Usage Cap: 200 GB
+			<br/>
+			Internet Usage Resets on 1st day of Every Month
+			<br/>
+			<br/>
+			<script type="text/javascript">
+			if(_useSuffix || _useSuffix != "")
+			{
+				document.write('ALL USAGE DETAILS ARE DISPLAYED IN: <b>' + getUsageDisplay(_useSuffix) + '</b></br></br>');
+			}
+			
+			document.write('<div class="bwm_usage_summary" style="color:orange">Downloaded:</div>');
+			document.write('<div class="bwm_usage_summary" style="color:orange">'+readablizeBytes(totalUsageDownloaded)+'</div>');
+			document.write('<div style="clear: both">');
+			document.write('<div class="bwm_usage_summary" style="color:blue">Uploaded:</div>');
+			document.write('<div class="bwm_usage_summary" style="color:blue">'+readablizeBytes(totalUsageUploaded)+'</div>');
+			document.write('<div style="clear: both">');
+			document.write('<div class="bwm_usage_summary" style="color:green">Total:</div>');
+			document.write('<div class="bwm_usage_summary" style="color:green">'+readablizeBytes(totalUsageDownloaded + totalUsageUploaded)+'</div>');
+			</script>
+			<br/>
+			<br/>
+		</div>
+        <div class="bwm_section_heading">
+            Day <input value="0" type="text" id="dayInput" style="width:25px;" />
+			<script type="text/javascript">
+				if(_userSelectDay && _userSelectDay != "")
+					document.getElementById("dayInput").value = _userSelectDay;
+			</script>
+			<a href="#" style="color:blue;" onclick="doDayUsage();"><u>Usage</u></a> (Defaults to current day)
+            <hr />
+        </div>
+        <div class="bwm_monthly_detailed">
+            <div class="headers">
+                <div class="small_header">
+                    User</div>
+                <div class="space">
+                    &nbsp;</div>
+                <div class="header">
+                    Download</div>
+                <div class="header">
+                    Upload</div>
+                <div class="header">
+                    Total</div>
+            </div>
+            <div style="clear: both">
+            </div>
+            <div class="results" id="dayUsageContainer">
+                <script type="text/javascript">
+					doDayUsage();
+                </script>
+            </div>
+        </div>
+		<div style="clear: both;" >
+		<br />
+		<div class="bwm_section_heading">
+            Monthly Usage - Daily Breakdown
+            <hr />
+        </div>
+		<div>
+			<div class="bwm_wrap_static_column_daily left_legend">
+			<table cellpadding="2" cellspacing="0">
+				<tr BGCOLOR="lightgrey">
+					<td class="bwm_daily_usage_header_td" style="text-align:left !important" > User </td>
+					<td class="bwm_daily_usage_header_td" style="text-align:left !important"> Total </td>
+					<td class="bwm_daily_usage_header_td" style="text-align:left !important"> Down/Up</td>
+				</tr>
+				<script type="text/javascript">
+					isYellow = true;
+					for (userIndex = 0; userIndex < users.length; userIndex++) {
+						var currentUser = users[userIndex];
+						var inResultId = userIndex + 'inResult';
+						var outResultId = userIndex + 'outResult';
+						backGroundStyle = "";
+						if (isYellow) {
+							backGroundStyle = 'BGCOLOR="#99CCFF"';
+							isYellow = false;
+						}
+						else {
+							//backGroundStyle = 'BGCOLOR="#99CCFF"';
+							isYellow = true;
+						}
+						inHTMLString = "";
+						outHTMLString = "";
+						var overallDownTotal = 0;
+						var overallUpTotal = 0;
+						for (dayIndex = 0; dayIndex < 31; dayIndex++) {
+							var dayTotalUp = 0;
+							var dayTotalDown = 0;
+							for (useIndex = 0; useIndex < currentUser.userUsage.length; useIndex++) {
+								var dayUsage = currentUser.userUsage[useIndex].dayUsages[dayIndex];
+								if (dayUsage) {
+									dayTotalDown += dayUsage.down;
+									dayTotalUp += dayUsage.up;
+								}
+							}
+							overallDownTotal += dayTotalDown;
+							overallUpTotal += dayTotalUp;
+						}
+						inHTMLString = '<td class="bwm_daily_summary_usage_td">' + readablizeBytes(overallDownTotal) + '</td>' + inHTMLString;
+						outHTMLString = '<td class="bwm_daily_summary_usage_td">' + readablizeBytes(overallUpTotal) + '</td>' + outHTMLString;
+						
+						document.write('<tr ' + backGroundStyle + '>');
+						document.write('<td rowspan="2" class="bwm_daily_summary_name_td">' + currentUser.ID + '</td>');
+						document.write('<td rowspan="2" style="color:green;" class="bwm_daily_summary_usage_td">' + readablizeBytes((currentUser.totalDown + currentUser.totalUp)) + '</td>');
+						document.write(inHTMLString);
+						document.write('</tr>');
+						document.write('<tr ' + backGroundStyle + '>');
+						document.write(outHTMLString);
+						document.write('</tr>');
+					}
+				</script>
+			</table>
+			</div>
+			<div class="bwm_wrap_daily">
+			<table class='bwm_wrap_data_daily' cellpadding="2" cellspacing="0">
+				<tr BGCOLOR="lightgrey">
+					<script type="text/javascript">
+					for (dayIndex = 0; dayIndex < 31; dayIndex++) {
+                        document.write('<td class="bwm_daily_usage_header_td" >' + (dayIndex + 1) + '</td>');
+                    }
+					</script>
+				</tr>
+				<script type="text/javascript">
+					isYellow = true;
+					for (userIndex = 0; userIndex < users.length; userIndex++) {
+						var currentUser = users[userIndex];
+						var inResultId = userIndex + 'inResult';
+						var outResultId = userIndex + 'outResult';
+						backGroundStyle = "";
+						if (isYellow) {
+							backGroundStyle = 'BGCOLOR="#99CCFF"';
+							isYellow = false;
+						}
+						else {
+							//backGroundStyle = 'BGCOLOR="#99CCFF"';
+							isYellow = true;
+						}
+						inHTMLString = "";
+						outHTMLString = "";
+						var overallDownTotal = 0;
+						var overallUpTotal = 0;
+						for (dayIndex = 0; dayIndex < 31; dayIndex++) {
+							var dayTotalUp = 0;
+							var dayTotalDown = 0;
+							for (useIndex = 0; useIndex < currentUser.userUsage.length; useIndex++) {
+								var dayUsage = currentUser.userUsage[useIndex].dayUsages[dayIndex];
+								if (dayUsage) {
+									dayTotalDown += dayUsage.down;
+									dayTotalUp += dayUsage.up;
+								}
+							}
+							overallDownTotal += dayTotalDown;
+							overallUpTotal += dayTotalUp;
+							inHTMLString += '<td class="bwm_daily_usage_td">' + readablizeBytes(dayTotalDown) + '</td>';
+							outHTMLString += '<td class="bwm_daily_usage_td">' + readablizeBytes(dayTotalUp) + '</td>';
+						}
+						
+						document.write('<tr ' + backGroundStyle + '>');
+						document.write(inHTMLString);
+						document.write('</tr>');
+						document.write('<tr ' + backGroundStyle + '>');
+						document.write(outHTMLString);
+						document.write('</tr>');
+						
+						if((userIndex + 1) == users.length)
+							document.write('<tr><td colspan="34">&nbsp;</td></tr>');
+					}
+				</script>
+			</table>
+			</div>
+		</div>
+		<div style="clear: both;" >
+		<br />
+        <div class="bwm_section_heading">
+            Monthly Usage - Summary
+            <hr />
+        </div>
+        <div class="bwm_monthly_summary">
+            <div class="headers">
+                <div class="small_header">
+                    User</div>
+                <div class="header">
+                    Download</div>
+                <div class="header">
+                    Upload</div>
+                <div class="header">
+                    Total</div>
+            </div>
+            <div style="clear: both">
+            </div>
+            <div class="results">
+                <script type="text/javascript">
+                    for (userIndex = 0; userIndex < users.length; userIndex++) {
+                        var currentUser = users[userIndex];
+                        document.write('<div class="result_section">');
+                        document.write('<div class="small_result">');
+                        document.write(currentUser.ID);
+                        document.write('</div>');
+                        document.write('<div class="result">');
+                        document.write(readablizeBytes(currentUser.totalDown));
+                        document.write('</div>');
+                        document.write('<div class="result">');
+                        document.write(readablizeBytes(currentUser.totalUp));
+                        document.write('</div>');
+                        document.write('<div class="result">');
+                        document.write('<font color="green"><b>' + readablizeBytes(currentUser.totalDown + currentUser.totalUp) + '</b></font>');
+                        document.write('</div>');
+                        document.write('</div>');
+                    }
+                </script>
+            </div>
+        </div>
+		<div style="clear: both;" >
+		<br />
+        <div class="bwm_section_heading">
+            Monthly Usage - Breakdown
+            <hr />
+        </div>
+        <div class="bwm_monthly_detailed">
+            <div class="headers">
+                <div class="small_header">
+                    User</div>
+                <div class="space">
+                    &nbsp;</div>
+                <div class="header">
+                    Download</div>
+                <div class="header">
+                    Upload</div>
+                <div class="header">
+                    Total</div>
+            </div>
+            <div style="clear: both">
+            </div>
+            <div class="results">
+                <script type="text/javascript">
+                    for (userIndex = 0; userIndex < users.length; userIndex++) {
+                        document.write('<div class="result_section">');
+                        var currentUser = users[userIndex];
+                        for (usageIndex = 0; usageIndex < (currentUser.userUsage.length + 1); usageIndex++) {
+                            var currentUsage = currentUser.userUsage[usageIndex];
+                            document.write('<div class="small_result">');
+                            if (usageIndex == 0) document.write(currentUser.ID); else document.write('&nbsp;');
+                            document.write('</div>');
+                            document.write('<div class="space">');
+                            if (currentUsage) document.write(currentUsage.ID); else document.write('<b>Total</b>');
+                            document.write('</div>');
+                            document.write('<div class="result">');
+                            if (currentUsage) document.write(readablizeBytes(currentUsage.totalDown)); else document.write('<font color="green"><b>' + readablizeBytes(currentUser.totalDown) + '</b></font>');
+                            document.write('</div>');
+                            document.write('<div class="result">');
+                            if (currentUsage) document.write(readablizeBytes(currentUsage.totalUp)); else document.write('<font color="green"><b>' + readablizeBytes(currentUser.totalUp) + '</b></font>');
+                            document.write('</div>');
+                            document.write('<div class="result">');
+                            if (currentUsage) document.write(readablizeBytes(currentUsage.total)); else document.write('<font color="green"><b>' + readablizeBytes(currentUser.totalDown + currentUser.totalUp) + '</b></font>');
+                            document.write('</div>');
+                            document.write('<br />');
+                        }
+                        document.write('</div>');
+                    }
+                </script>
+            </div>
+        </div>
+
+		<!--<div style="clear: both;" >
+		<br />
+		<div class="bwm_section_heading">
+            Monthly Usage - Daily Breakdown (Vertical)
+            <hr />
+        </div>
+        <div class="bwm_day_summary">
+            <div class="bwm_wrap_static_column left_legend">
+                <div class="header">
+                    DAY</div>
+                <br />
+                <div>
+                    &nbsp</div>
+                <script type="text/javascript">
+                    for (dayIndex = 0; dayIndex < 31; dayIndex++) {
+                        document.write('<div class="day" >' + (dayIndex + 1) + '</div>');
+                    }
+                </script>
+                <div class="day">
+                    Total:
+                </div>
+            </div>
+			<div class="bwm_wrap">
+			<table class='bwm_wrap_data'>
+			<tr>
+				<script type="text/javascript">
+					isYellow = true;
+					for (userIndex = 0; userIndex < users.length; userIndex++) {
+						var currentUser = users[userIndex];
+						var inResultId = userIndex + 'inResult';
+						var outResultId = userIndex + 'outResult';
+						backGroundStyle = "";
+						if (isYellow) {
+							backGroundStyle = 'style="background:lightblue;"';
+							isYellow = false;
+						}
+						else {
+							backGroundStyle = 'style="background:lightgrey;"';
+							isYellow = true;
+						}
+						document.write('<td>');
+						document.write('<div class="result" ' + backGroundStyle + '>');
+						document.write('<div class="header">' + currentUser.ID + '</div>');
+						document.write('<div id="' + inResultId + '" class="in_result"></div>');
+						document.write('<div id="' + outResultId + '" class="out_result"></div>');
+						inHTMLString = "";
+						outHTMLString = "";
+						var overallDownTotal = 0;
+						var overallUpTotal = 0;
+						for (dayIndex = 0; dayIndex < 31; dayIndex++) {
+							var dayTotalUp = 0;
+							var dayTotalDown = 0;
+							for (useIndex = 0; useIndex < currentUser.userUsage.length; useIndex++) {
+								var dayUsage = currentUser.userUsage[useIndex].dayUsages[dayIndex];
+								if (dayUsage) {
+									dayTotalDown += dayUsage.down;
+									dayTotalUp += dayUsage.up;
+								}
+							}
+							overallDownTotal += dayTotalDown;
+							overallUpTotal += dayTotalUp;
+							if (dayIndex == 0) inHTMLString += '<u>Downloaded</u> </br>';
+							inHTMLString += '<div class="day_result">' + readablizeBytes(dayTotalDown) + '</div></br>';
+							if (dayIndex == 0) outHTMLString += '<u>Uploaded</u> </br>';
+							outHTMLString += '<div class="day_result">' + readablizeBytes(dayTotalUp) + '</div></br>';
+						}
+						inHTMLString += '<div style="font-weight:bold">' + readablizeBytes(overallDownTotal) + '</div></br>';
+						outHTMLString += '<div style="font-weight:bold">' + readablizeBytes(overallUpTotal) + '</div></br>';
+						document.getElementById(inResultId).innerHTML = inHTMLString;
+						document.getElementById(outResultId).innerHTML = outHTMLString;
+						document.write('<div class="header" style="color:green;">' + readablizeBytes((currentUser.totalDown + currentUser.totalUp)) + '</div>');
+						document.write('</div>');
+						document.write('</td>');
+					}
+				</script>
+			</tr>
+			<tr>
+				<td>
+					&nbsp;
+				</td>
+			</tr>
+			</table>
+			</div>
+        </div> -->
+    </div>
+</body>
+</html>

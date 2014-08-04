@@ -14,18 +14,20 @@ touch $MONITOR_LOCK_FILE
 MONITOR_CLIENTKEY_FILE_PATH=/tmp/clientKey
 CHAIN_RULE='BWMON'
 CONNECTED_USERS_FILE=/proc/net/arp
-LAN_IFACE=`nvram get lan_ifname`
+#LAN_IFACE=`nvram get lan_ifname`
+LAN_IFACE='br-lan'
 DNSMASQ_TEMP_FILE_PATH=/tmp/dnsmasq2users.file
 DEFAULT_USAGE_FILE_PATH=/tmp/mac_usage.db
 JAVASCRIPT_FILE_NAME='user_details.js'
 #Fields
-_intervalUpdate=$1
-_iterationPublish=$2
-_iterationBackup=$3
-_resetDay=$4
-_userFilePath=$5
-_backupUsageFilePath=$6
-_backupHistoryPath=$7
+_intervalUpdate="10"
+_iterationPublish="3"
+_iterationBackup="6"
+_resetDay="1"
+_userFilePath="/root/users.txt"
+_backupUsageFilePath="/tmp/mac_usage.backup"
+_backupHistoryPath="/tmp/history/"
+mkdir -p /tmp/history
 _macUsageFilePath=$8 #Optional. 3 different values
 _javascriptPath=$9 #Optional
 _doUsageFileRestore=1 #Optional 10
@@ -35,7 +37,7 @@ _recordDailyUsage=0 #Optional 13
 _autoAddUserMACs=1 #Optional 14
 _supportBit32=0 #Optional 15
 _showMAC=0 #Optional 16
-_logFilePath='' #Optional 17
+_logFilePath='/tmp/bw.log' #Optional 17
 _clientsDetails=""
 _dnsmasqFilePath=""
 _previousDay=`date +%d`
@@ -276,7 +278,7 @@ checkReset()
 {
 	secondsUntilNextDay=`expr $(expr $(date +%H) '*' 60 '*' 60) + $(expr $(date +%M) '*' 60) + $(expr $(date +%S))`
 	secondsUntilNextDay=`expr 86400 - $secondsUntilNextDay`
-	nextDay=`date --date='next day' +"%d"`
+	nextDay=`/usr/bin/date --date='next day' +"%d"`
 	if [ $? -ne 0 ]; then
 	  #Attempt another way to determine the next day
 	  nextDay=`TZ=MST-24 date +"%d"`
@@ -297,7 +299,7 @@ checkReset()
 	  #wait until next day
 	  sleep 10
 	  currentDay=`expr $(date +%d) '*' 1`
-	  while [ $currentDay -ne $resetDay ]; do
+	  while [ $currentDay != $resetDay ]; do
 		 sleep 10
 		 currentDay=`expr $(date +%d) '*' 1`
 	  done
@@ -402,7 +404,7 @@ newUsageOut=`echo "$currentIPData" | awk '{print $2,$8}' | grep "$currentIP" | a
 currentUsageLine=`echo "$_macUsageData" | grep -i "$currentMAC,.*,.*,.*,$currentDay"`
 #If the line exists, update it, else just append a new line
 if [ -n "$currentUsageLine" ]; then
-  if [ "$newUsageIn" != "0" ] || [ -n "$newUsageOut" != "0" ];  then
+  if [ "$newUsageIn" != "0" ] || [ "$newUsageOut" != "0" ];  then
 	dbUsageIn=`echo "$currentUsageLine" | cut -d, -f3`
 	dbUsageOut=`echo "$currentUsageLine" | cut -d, -f4`
 	[ -z "$dbUsageIn" ] && dbUsageIn='0'
@@ -614,7 +616,7 @@ currentScript=`cat $scriptFilePathName`
 loadUsageData
 [ $_recordDailyUsage -eq 1 ] && currentDay=`date +%d` || currentDay='01'
 
-if [ "$_previousDay" != "$currentDay" ]; then
+if [ "$_previousDay" != "$currrentDay" ]; then
 	previous=`expr $_previousDay '*' 1`
 	today=`expr $currentDay '*' 1`
 	replaceToday='_todaysDay='"$previous"
@@ -624,6 +626,8 @@ fi
 	
 clientsLineIndex=1
 currentClient=`echo "$_clientsDetails" | sed -n "$clientsLineIndex"'p'`
+
+
 while [ -n "$currentClient" ]; do
   currentMAC=`echo "$currentClient" | cut -d, -f1`
   macType=`echo "$currentClient" | cut -d, -f4`
@@ -665,6 +669,8 @@ while [ -n "$currentClient" ]; do
 clientsLineIndex=`expr $clientsLineIndex + 1`
 currentClient=`echo "$_clientsDetails" | sed -n "$clientsLineIndex"'p'`
 done
+
+
 #Copy new information to file
 if [ -n "$currentScript" ]; then
 	[ -f $scriptFilePathName ] &&  rm -f $scriptFilePathName
@@ -713,6 +719,7 @@ fi
 if [ -z "$_javascriptPath" ]; then
 	[ -n "$_logFilePath" ] && bwMonitorLog 'Setting default file path for javascript output. /tmp/www/'
 	_javascriptPath=/tmp/www/
+    mkdir -p /tmp/www/
 fi
 if [ $_doUsageFileRestore -eq 1 ]; then
 	[ "$_macUsageFilePath" = "1" ] && _macUsageData=`cat $_backupUsageFilePath` || cp -f $_backupUsageFilePath $_macUsageFilePath
